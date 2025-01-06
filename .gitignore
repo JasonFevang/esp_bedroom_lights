@@ -1,0 +1,5 @@
+build/
+.cache/
+
+# Instead of committing sdkconfig, it is recommended to ignore it in your .gitignore file and only commit the sdkconfig.defaults (if any) or the configuration files that you intend to share between contributors.
+sdkconfig

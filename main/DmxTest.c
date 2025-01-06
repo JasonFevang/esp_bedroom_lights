@@ -1,0 +1,76 @@
+/*
+
+  ESP-IDF DMX Write
+
+  Writes data to the DMX bus. The value of every byte in the DMX packet (except
+  the start code) is incremented by 1 every 1 second.
+
+  Note: this example is for use with the ESP-IDF. It will not work on Arduino!
+
+  Created 20 June 2022
+  By Mitch Weisbrod
+
+  https://github.com/someweisguy/esp_dmx
+
+*/
+#include "dmx/include/driver.h"
+#include "esp_dmx.h"
+#include "esp_log.h"
+#include "freertos/task.h"
+#include <string.h>
+
+#define TAG "Main"
+
+#define TX_PIN 19 // the pin we are using to TX with
+#define RX_PIN 18 // the pin we are using to RX with
+#define EN_PIN 26 // the pin we are using to enable TX on the DMX transceiver
+
+static uint8_t data[DMX_PACKET_SIZE] = {}; // Buffer to store DMX data
+
+typedef struct {
+  uint8_t red;
+  uint8_t green;
+  uint8_t blue;
+  uint8_t white;
+} bar_footprint_t;
+
+typedef struct {
+  uint8_t red;
+  uint8_t green;
+  uint8_t blue;
+  uint8_t white;
+} bed_footprint_t;
+
+static const uint16_t BAR_ADDRESS = 1;
+static const uint16_t BED_ADDRESS = BAR_ADDRESS + sizeof(bar_footprint_t);
+
+void app_main() {
+  ESP_LOGI(TAG, "Hello World!");
+
+  // Initialize dmx
+  const dmx_port_t dmx_num = DMX_NUM_1;
+  dmx_config_t config = DMX_CONFIG_DEFAULT;
+  const int personality_count = 0;
+  dmx_driver_install(dmx_num, &config, NULL, personality_count);
+  dmx_set_pin(dmx_num, TX_PIN, RX_PIN, EN_PIN);
+
+  // Initialize dmx frame
+  const bar_footprint_t bar_footprint = {0, 0, 0, 0};
+  const bed_footprint_t bed_footprint = {0, 0, 0, 0};
+  memcpy(data + BAR_ADDRESS, &bar_footprint, sizeof(bar_footprint_t));
+  memcpy(data + BED_ADDRESS, &bed_footprint, sizeof(bed_footprint_t));
+
+  // Write frame
+  dmx_write(dmx_num, data, DMX_PACKET_SIZE);
+
+  while (1) {
+    TickType_t now = xTaskGetTickCount();
+
+    // Send data and block until it's sent
+    dmx_send_num(dmx_num, DMX_PACKET_SIZE);
+    dmx_wait_sent(dmx_num, DMX_TIMEOUT_TICK);
+
+    // Only send a packet every 30ms
+    vTaskDelayUntil(&now, pdMS_TO_TICKS(30));
+  }
+}
