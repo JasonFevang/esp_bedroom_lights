@@ -8,8 +8,7 @@
 #include "freertos/task.h"
 #include <string.h>
 
-#include "lwip/err.h"
-#include "lwip/sys.h"
+wifi_state_t wifi_connection = WIFI_DISCONNECTED;
 
 #define EXAMPLE_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
@@ -102,8 +101,10 @@ void wifi_loop(TickType_t *next_update) {
         /* xEventGroupWaitBits() returns the bits before the call returned,
          * hence we can test which event actually happened. */
         if (bits & WIFI_CONNECTED_BIT) {
+            wifi_connection = WIFI_CONNECTED;
             ESP_LOGI(TAG, "connected to ap SSID:%s", EXAMPLE_ESP_WIFI_SSID);
         } else if (bits & WIFI_FAIL_BIT) {
+            wifi_connection = WIFI_DISCONNECTED;
             ESP_LOGI(TAG, "Failed to connect to SSID:%s",
                      EXAMPLE_ESP_WIFI_SSID);
         }

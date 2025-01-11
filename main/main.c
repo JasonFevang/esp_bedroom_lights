@@ -9,7 +9,7 @@
 
 #define TAG "Main"
 
-void init_nvs(){
+void init_nvs() {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
         ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
