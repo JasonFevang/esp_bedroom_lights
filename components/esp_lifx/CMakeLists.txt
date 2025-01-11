@@ -1,2 +1,4 @@
 idf_component_register(SRCS "esp_lifx.c"
-                    INCLUDE_DIRS "include")
+                    INCLUDE_DIRS "include"
+                    REQUIRES esp_event esp_netif nvs_flash)
+
