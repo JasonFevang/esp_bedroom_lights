@@ -84,28 +84,30 @@ void wifi_init() {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
-
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT)
-     * or connection failed for the maximum number of re-tries (WIFI_FAIL_BIT).
-     * The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                           pdFALSE, pdFALSE, portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we
-     * can test which event actually happened. */
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s",
-                 EXAMPLE_ESP_WIFI_SSID);
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s",
-                 EXAMPLE_ESP_WIFI_SSID);
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
 }
 
 /*
 Call from superloop
 */
-void wifi_loop(TickType_t *next_update) {}
+void wifi_loop(TickType_t *next_update) {
+    static const TickType_t WIFI_CHECK_PERIOD = pdMS_TO_TICKS(50);
+    const TickType_t now = xTaskGetTickCount();
+
+    if (now > *next_update) {
+        // Check if wifi has connected or failed to connect, and log it
+        const EventBits_t bits = xEventGroupWaitBits(
+            s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE,
+            pdFALSE, 0);
+
+        /* xEventGroupWaitBits() returns the bits before the call returned,
+         * hence we can test which event actually happened. */
+        if (bits & WIFI_CONNECTED_BIT) {
+            ESP_LOGI(TAG, "connected to ap SSID:%s", EXAMPLE_ESP_WIFI_SSID);
+        } else if (bits & WIFI_FAIL_BIT) {
+            ESP_LOGI(TAG, "Failed to connect to SSID:%s",
+                     EXAMPLE_ESP_WIFI_SSID);
+        }
+
+        *next_update = now + WIFI_CHECK_PERIOD;
+    }
+}
