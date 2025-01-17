@@ -33,4 +33,12 @@ typedef struct {
 static_assert(sizeof(lx_protocol_header_t) == 36,
               "Incorrect lx_protocol_header_t size");
 
+#pragma pack(push, 1)
+typedef struct {
+    uint8_t service; // using lx_services_t enum
+    uint32_t port;   // The port of the service. This value is usually 56700 but
+                     // you should not assume this is always the case.
+} lx_state_service_payload_t;
+#pragma pack(pop)
+
 #endif // STRUCTS_H

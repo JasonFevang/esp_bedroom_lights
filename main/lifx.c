@@ -1,4 +1,5 @@
 #include "lifx.h"
+#include "lifx_enums.h"
 #include "lifx_structs.h"
 #include "udp.h"
 #include "wifi.h"
@@ -15,7 +16,8 @@
 
 #define HOST_IP_ADDR CONFIG_EXAMPLE_IPV4_ADDR
 
-#define PORT CONFIG_EXAMPLE_PORT
+#define DISCOVERY_PORT 56700
+#define BROADCAST_IP "255.255.255.255"
 
 static const char *TAG = "lifx";
 
@@ -59,13 +61,18 @@ uint32_t populate_tx_buf(uint8_t *buf, uint32_t buf_len) {
     header.res_required = 0;
     header.ack_required = 0;
     header.sequence = 0;
-    header.type = 2;
+    header.type = LX_PACKET_GET_SERVICE;
     memcpy(buf, &header, sizeof(header));
     return sizeof(header);
 }
+void print_state_service_payload(const lx_state_service_payload_t *payload) {
+    printf("lx_state_service_payload_t:\n");
+    printf("  Service: %u\n", payload->service);
+    printf("  port: %lu\n", payload->port);
+}
 
 void print_lx_protocol_header(const lx_protocol_header_t *header,
-                              uint32_t buf_len) {
+                              uint32_t payload_len) {
     printf("lx_protocol_header_t:\n");
     printf("  Frame:\n");
     printf("    Size: %u\n", header->size);
@@ -91,7 +98,7 @@ void print_lx_protocol_header(const lx_protocol_header_t *header,
 
     printf("  Protocol Header:\n");
     printf("    Type: %u\n", header->type);
-    printf("  Pay load size: %ld\n", buf_len - sizeof(lx_protocol_header_t));
+    printf("  Pay load size: %ld\n", payload_len);
 }
 
 void decode_buf(uint8_t *buf, uint32_t buf_len) {
@@ -104,15 +111,32 @@ void decode_buf(uint8_t *buf, uint32_t buf_len) {
     }
     lx_protocol_header_t header;
     memcpy(&header, buf, sizeof(lx_protocol_header_t));
-    print_lx_protocol_header(&header, buf_len);
+    const uint32_t payload_len = header.size - sizeof(lx_protocol_header_t);
+    print_lx_protocol_header(&header, payload_len);
+
+    if (header.type == LX_PACKET_STATE_SERVICE) {
+        if (payload_len != sizeof(lx_state_service_payload_t)) {
+            ESP_LOGW(
+                TAG,
+                "Packet contains a payload of size '%lu' bytes, but packet "
+                "'%d' expects size '%d' bytes. Ignoring",
+                payload_len, LX_PACKET_STATE_SERVICE,
+                sizeof(lx_state_service_payload_t));
+            return;
+        }
+
+        lx_state_service_payload_t payload;
+        memcpy(&payload, buf + sizeof(lx_protocol_header_t), payload_len);
+        print_state_service_payload(&payload);
+    }
 }
 
 /*
 Call from superloop
 */
 void lifx_loop(TickType_t *next_update) {
-    static const TickType_t LIFX_RESEND_PERIOD = pdMS_TO_TICKS(600);
-    static const TickType_t WAIT_TIME = pdMS_TO_TICKS(1000);
+    static const TickType_t LIFX_RESEND_PERIOD = pdMS_TO_TICKS(1000);
+    static const TickType_t WAIT_TIME = pdMS_TO_TICKS(2500);
 
     static TickType_t last_send = 0;
     static TickType_t wait_start;
@@ -131,8 +155,8 @@ void lifx_loop(TickType_t *next_update) {
 
         uint32_t data_len = populate_tx_buf(tx_buffer, 1024);
 
-        const esp_err_t res = my_udp_send(sock, tx_buffer, data_len, PORT,
-                                          inet_addr(HOST_IP_ADDR));
+        const esp_err_t res = my_udp_send(
+            sock, tx_buffer, data_len, DISCOVERY_PORT, inet_addr(BROADCAST_IP));
         if (res == ESP_FAIL) {
             ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
         } else {
