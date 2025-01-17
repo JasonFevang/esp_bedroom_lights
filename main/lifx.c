@@ -65,41 +65,6 @@ uint32_t populate_tx_buf(uint8_t *buf, uint32_t buf_len) {
     memcpy(buf, &header, sizeof(header));
     return sizeof(header);
 }
-void print_state_service_payload(const lx_state_service_payload_t *payload) {
-    printf("lx_state_service_payload_t:\n");
-    printf("  Service: %u\n", payload->service);
-    printf("  port: %lu\n", payload->port);
-}
-
-void print_lx_protocol_header(const lx_protocol_header_t *header,
-                              uint32_t payload_len) {
-    printf("lx_protocol_header_t:\n");
-    printf("  Frame:\n");
-    printf("    Size: %u\n", header->size);
-    printf("    Protocol: %u\n", header->protocol);
-    printf("    Addressable: %u\n", header->addressable);
-    printf("    Tagged: %u\n", header->tagged);
-    printf("    Origin: %u\n", header->origin);
-    printf("    Source: %lu\n", header->source);
-
-    printf("  Frame Address:\n");
-    printf("    Target: ");
-    for (int i = 0; i < 8; i++) {
-        printf("%02X", header->target[i]);
-        if (i < 7) {
-            printf(":");
-        }
-    }
-    printf("\n");
-
-    printf("    Res Required: %u\n", header->res_required);
-    printf("    Ack Required: %u\n", header->ack_required);
-    printf("    Sequence: %u\n", header->sequence);
-
-    printf("  Protocol Header:\n");
-    printf("    Type: %u\n", header->type);
-    printf("  Pay load size: %ld\n", payload_len);
-}
 
 void decode_buf(uint8_t *buf, uint32_t buf_len) {
     if (buf_len < sizeof(lx_protocol_header_t)) {
@@ -112,7 +77,7 @@ void decode_buf(uint8_t *buf, uint32_t buf_len) {
     lx_protocol_header_t header;
     memcpy(&header, buf, sizeof(lx_protocol_header_t));
     const uint32_t payload_len = header.size - sizeof(lx_protocol_header_t);
-    print_lx_protocol_header(&header, payload_len);
+    lx_protocol_header_print(&header, payload_len);
 
     if (header.type == LX_PACKET_STATE_SERVICE) {
         if (payload_len != sizeof(lx_state_service_payload_t)) {
@@ -127,7 +92,7 @@ void decode_buf(uint8_t *buf, uint32_t buf_len) {
 
         lx_state_service_payload_t payload;
         memcpy(&payload, buf + sizeof(lx_protocol_header_t), payload_len);
-        print_state_service_payload(&payload);
+        lx_payload_state_service_print(&payload);
     }
 }
 

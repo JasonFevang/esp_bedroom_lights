@@ -33,6 +33,9 @@ typedef struct {
 static_assert(sizeof(lx_protocol_header_t) == 36,
               "Incorrect lx_protocol_header_t size");
 
+void lx_protocol_header_print(const lx_protocol_header_t *header,
+                              uint32_t payload_len);
+
 #pragma pack(push, 1)
 typedef struct {
     uint8_t service; // using lx_services_t enum
@@ -40,5 +43,7 @@ typedef struct {
                      // you should not assume this is always the case.
 } lx_state_service_payload_t;
 #pragma pack(pop)
+
+void lx_payload_state_service_print(const lx_state_service_payload_t *payload);
 
 #endif // STRUCTS_H
