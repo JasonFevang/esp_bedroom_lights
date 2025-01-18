@@ -1,4 +1,4 @@
-#include "lifx_structs.h"
+#include "structs.h"
 #include <stdio.h>
 
 void lx_protocol_header_print(const lx_protocol_header_t *header,

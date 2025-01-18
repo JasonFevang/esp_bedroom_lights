@@ -1,6 +1,6 @@
 #include "lifx.h"
-#include "lifx_enums.h"
-#include "lifx_structs.h"
+#include "lifx/enums.h"
+#include "lifx/structs.h"
 #include "udp.h"
 #include "wifi.h"
 
