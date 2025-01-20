@@ -1,11 +1,12 @@
 #include "lifx.h"
-#include "lifx/enums.h"
-#include "lifx/structs.h"
+#include "lwip/sockets.h"
 #include "udp.h"
 #include "wifi.h"
+#include <esp_lifx.h>
+#include <lifx/enums.h>
+#include <lifx/structs.h>
 
 #include "freertos/FreeRTOS.h"
-#include <esp_lifx.h>
 #include <esp_log.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
@@ -16,14 +17,38 @@
 
 #define HOST_IP_ADDR CONFIG_EXAMPLE_IPV4_ADDR
 
-#define DISCOVERY_PORT 56700
-#define BROADCAST_IP "255.255.255.255"
-
 static const char *TAG = "lifx";
 
-static uint8_t rx_buffer[1024];
-static uint8_t tx_buffer[1024];
 static int sock;
+static lx_client_t *lx_client;
+
+typedef enum { WAIT_WIFI, TX, RX, DELAY_START, DELAY } udp_state_t;
+
+static udp_state_t state;
+
+static void event_cb(lx_event_t event) {
+    if (event.type != LX_EVENT_MSG_RX) {
+        ESP_LOGE(TAG, "Cannot handle event '%d'", event.type);
+        return;
+    };
+    lx_message_t *message = (lx_message_t *)event.data;
+
+    const lx_protocol_header_t *header =
+        (const lx_protocol_header_t *)(message->payload -
+                                       sizeof(lx_protocol_header_t));
+
+    lx_protocol_header_print(header,
+                             header->size - sizeof(lx_protocol_header_t));
+
+    if (message->type == LX_PACKET_STATE_SERVICE) {
+        const lx_state_service_payload_t *payload =
+            (const lx_state_service_payload_t *)message->payload;
+        lx_payload_state_service_print(payload);
+    }
+
+    // TODO: This is jank. I need a better state machine to do this
+    state = DELAY_START;
+}
 
 void lifx_init() {
     sock = my_udp_create_socket();
@@ -31,69 +56,9 @@ void lifx_init() {
         ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
         return;
     }
-
     ESP_LOGI(TAG, "Socket created");
-}
 
-typedef enum { WAIT_WIFI, TX, RX, DELAY } udp_state_t;
-
-static udp_state_t state;
-
-void print_buffer(const uint8_t *buffer, uint32_t len) {
-    for (uint32_t i = 0; i < len; i++) {
-        printf("%02X ", buffer[i]);
-        if ((i + 1) % 16 == 0) {
-            printf("\n"); // New line every 16 bytes
-        }
-    }
-    printf("\n");
-}
-
-uint32_t populate_tx_buf(uint8_t *buf, uint32_t buf_len) {
-    lx_protocol_header_t header;
-    memset(&header, 0, sizeof(header));
-    header.size = sizeof(lx_protocol_header_t);
-    header.protocol = 1024;
-    header.addressable = 1;
-    header.tagged = 1;
-    header.origin = 0;
-    header.source = 12345678;
-    header.res_required = 0;
-    header.ack_required = 0;
-    header.sequence = 0;
-    header.type = LX_PACKET_GET_SERVICE;
-    memcpy(buf, &header, sizeof(header));
-    return sizeof(header);
-}
-
-void decode_buf(uint8_t *buf, uint32_t buf_len) {
-    if (buf_len < sizeof(lx_protocol_header_t)) {
-        ESP_LOGW(TAG,
-                 "Received message smaller than lx_protocol_header, %d bytes. "
-                 "ignoring",
-                 sizeof(lx_protocol_header_t));
-        return;
-    }
-    lx_protocol_header_t header;
-    memcpy(&header, buf, sizeof(lx_protocol_header_t));
-    const uint32_t payload_len = header.size - sizeof(lx_protocol_header_t);
-    lx_protocol_header_print(&header, payload_len);
-
-    if (header.type == LX_PACKET_STATE_SERVICE) {
-        if (payload_len != sizeof(lx_state_service_payload_t)) {
-            ESP_LOGW(
-                TAG,
-                "Packet contains a payload of size '%lu' bytes, but packet "
-                "'%d' expects size '%d' bytes. Ignoring",
-                payload_len, LX_PACKET_STATE_SERVICE,
-                sizeof(lx_state_service_payload_t));
-            return;
-        }
-
-        lx_state_service_payload_t payload;
-        memcpy(&payload, buf + sizeof(lx_protocol_header_t), payload_len);
-        lx_payload_state_service_print(&payload);
-    }
+    lx_client = lx_client_create(sock, lx_udp_tx, lx_udp_rx, event_cb);
 }
 
 /*
@@ -118,15 +83,17 @@ void lifx_loop(TickType_t *next_update) {
     case TX: {
         last_send = now;
 
-        uint32_t data_len = populate_tx_buf(tx_buffer, 1024);
+        const lx_message_t message = {.type = LX_PACKET_GET_SERVICE,
+                                      .payload = NULL};
+        const lx_err_t err =
+            lx_client_send_message(lx_client, &lx_broadcast_device, &message);
 
-        const esp_err_t res = my_udp_send(
-            sock, tx_buffer, data_len, DISCOVERY_PORT, inet_addr(BROADCAST_IP));
-        if (res == ESP_FAIL) {
+        if (err != LX_OK) {
             ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
         } else {
             ESP_LOGI(TAG, "Message sent");
         }
+
         state = RX;
         break;
     }
@@ -137,25 +104,12 @@ void lifx_loop(TickType_t *next_update) {
             return;
         }
 
-        uint32_t len;
-        uint16_t port;
-        in_addr_t ip_addr;
-        const esp_err_t res = my_udp_receive(
-            sock, rx_buffer, sizeof(rx_buffer) - 1, &len, &port, &ip_addr);
-        if (res == ESP_ERR_TIMEOUT) {
-            break;
-        }
-        if (res == ESP_FAIL) {
-            ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
-            break;
-        }
-
-        ESP_LOGI(TAG, "Received %lu bytes from %s:", len, inet_ntoa(ip_addr));
-        print_buffer(rx_buffer, len);
-        decode_buf(rx_buffer, len);
-
-        state = DELAY;
+        lx_client_poll(lx_client);
+        break;
+    }
+    case DELAY_START: {
         wait_start = now;
+        state = DELAY;
         break;
     }
     case DELAY: {

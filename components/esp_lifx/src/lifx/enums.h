@@ -5,6 +5,12 @@
 #include <stdint.h>
 
 typedef enum {
+    LX_OK = 0,
+    LX_ERR = 1,
+    LX_TIMEOUT = 2,
+} lx_err_t;
+
+typedef enum {
     LX_SERVICES_UDP = 1,
     LX_SERVICES_RESERVED1 = 2,
     LX_SERVICES_RESERVED2 = 3,
@@ -13,6 +19,7 @@ typedef enum {
 } lx_services_t;
 
 typedef enum {
+    LX_PACKET_NONE = 0,
     LX_PACKET_GET_SERVICE = 2,
     LX_PACKET_STATE_SERVICE = 3
 } lx_packet_t;

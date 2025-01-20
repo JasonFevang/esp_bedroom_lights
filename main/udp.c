@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include <esp_lifx.h>
+#include <lifx/enums.h>
 #include <lwip/netdb.h>
 #include <lwip/sockets.h>
 
@@ -27,19 +29,19 @@ int my_udp_create_socket() {
     return res_sock;
 }
 
-esp_err_t my_udp_send(int sock, const uint8_t *data, uint32_t data_len,
-                      uint16_t port, in_addr_t ip_addr) {
+lx_err_t lx_udp_tx(int sock, const uint8_t *data, uint32_t data_len,
+                   uint16_t port, uint32_t ip_addr) {
     struct sockaddr_in dest_addr = {.sin_family = AF_INET,
                                     .sin_port = htons(port),
                                     .sin_addr = {.s_addr = ip_addr}};
 
     const int err = sendto(sock, data, data_len, 0,
                            (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    return err < 0 ? ESP_FAIL : ESP_OK;
+    return err < 0 ? LX_ERR : LX_OK;
 }
 
-esp_err_t my_udp_receive(int sock, uint8_t *rx_buf, uint32_t rx_buf_sz,
-                         uint32_t *len, uint16_t *port, in_addr_t *ip_addr) {
+lx_err_t lx_udp_rx(int sock, uint8_t *rx_buf, uint32_t rx_buf_sz, uint32_t *len,
+                   uint16_t *port, uint32_t *ip_addr) {
     assert(rx_buf != NULL && len != NULL && port != NULL && ip_addr != NULL);
 
     struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
@@ -52,16 +54,16 @@ esp_err_t my_udp_receive(int sock, uint8_t *rx_buf, uint32_t rx_buf_sz,
     if (res < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // No data available, can try again later
-            return ESP_ERR_TIMEOUT;
+            return LX_TIMEOUT;
         }
-        return ESP_FAIL;
+        return LX_ERR;
     }
 
     // Validate we're ipv4
     if (source_addr.ss_family != AF_INET) {
         ESP_LOGE(TAG, "Error: only support ipv4, but found family '%d'",
                  source_addr.ss_family);
-        return ESP_FAIL;
+        return LX_ERR;
     }
 
     *len = res;
@@ -72,5 +74,5 @@ esp_err_t my_udp_receive(int sock, uint8_t *rx_buf, uint32_t rx_buf_sz,
     // Extract the port
     *port = ntohs(((struct sockaddr_in *)&source_addr)->sin_port);
 
-    return ESP_OK;
+    return LX_OK;
 }
