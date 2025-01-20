@@ -8,7 +8,6 @@
 #include <sys/param.h>
 
 #include <esp_lifx.h>
-#include <lifx/enums.h>
 #include <lwip/netdb.h>
 #include <lwip/sockets.h>
 

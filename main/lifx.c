@@ -3,7 +3,6 @@
 #include "udp.h"
 #include "wifi.h"
 #include <esp_lifx.h>
-#include <lifx/enums.h>
 #include <lifx/packets.h>
 
 #include "freertos/FreeRTOS.h"

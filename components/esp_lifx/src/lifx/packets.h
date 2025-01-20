@@ -4,6 +4,13 @@
 #include <assert.h>
 #include <stdint.h>
 
+// The number identifying each packet type. Value of header.type
+typedef enum {
+    LX_PACKET_NONE = 0,
+    LX_PACKET_GET_SERVICE = 2,
+    LX_PACKET_STATE_SERVICE = 3
+} lx_packet_t;
+
 #pragma pack(push, 1)
 typedef struct {
     /* frame */
@@ -43,6 +50,14 @@ typedef struct {
                      // you should not assume this is always the case.
 } lx_state_service_payload_t;
 #pragma pack(pop)
+
+typedef enum {
+    LX_SERVICES_UDP = 1,
+    LX_SERVICES_RESERVED1 = 2,
+    LX_SERVICES_RESERVED2 = 3,
+    LX_SERVICES_RESERVED3 = 4,
+    LX_SERVICES_RESERVED4 = 5
+} lx_services_t;
 
 void lx_payload_state_service_print(const lx_state_service_payload_t *payload);
 

@@ -1,10 +1,10 @@
 #ifndef UDP_H
 #define UDP_H
 
+#include "esp_lifx.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sys/types.h"
-#include <lifx/enums.h>
 
 /*
  */
