@@ -1,6 +1,6 @@
 #include "esp_lifx.h"
 #include "lifx/enums.h"
-#include "lifx/structs.h"
+#include "lifx/packets.h"
 #include <esp_log.h> // TODO: Remove dependency on esp_log
 #include <string.h>
 

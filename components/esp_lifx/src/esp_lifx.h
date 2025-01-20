@@ -1,14 +1,16 @@
 #ifndef ESP_LIFX_H
 #define ESP_LIFX_H
 #include "lifx/enums.h"
-#include "lifx/structs.h"
+#include "lifx/packets.h"
 
+// An lifx device clients can send/receive messages from
 typedef struct {
     uint32_t ip;
     uint16_t port;
     uint64_t target;
 } lx_device_t;
 
+// The broadcast device used to send discovery messages
 extern const lx_device_t lx_broadcast_device;
 
 // udp tx function

@@ -1,5 +1,5 @@
-#ifndef STRUCTS_H
-#define STRUCTS_H
+#ifndef PACKETS_H
+#define PACKETS_H
 
 #include <assert.h>
 #include <stdint.h>
@@ -46,4 +46,4 @@ typedef struct {
 
 void lx_payload_state_service_print(const lx_state_service_payload_t *payload);
 
-#endif // STRUCTS_H
+#endif // PACKETS_H

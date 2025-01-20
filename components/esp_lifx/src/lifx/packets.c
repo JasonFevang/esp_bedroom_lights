@@ -1,4 +1,4 @@
-#include "structs.h"
+#include "packets.h"
 #include <stdio.h>
 
 void lx_protocol_header_print(const lx_protocol_header_t *header,

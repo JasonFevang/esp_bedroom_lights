@@ -4,7 +4,7 @@
 #include "wifi.h"
 #include <esp_lifx.h>
 #include <lifx/enums.h>
-#include <lifx/structs.h>
+#include <lifx/packets.h>
 
 #include "freertos/FreeRTOS.h"
 #include <esp_log.h>
