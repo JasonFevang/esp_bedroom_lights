@@ -83,17 +83,17 @@ static lx_err_t validate_payload_size(lx_packet_t packet_type,
         return LX_OK;
     }
     ESP_LOGW(TAG, "Unkown packet type, cannot validate payload size");
-    return LX_OK;
+    return LX_ERR;
 }
 
-static lx_err_t decode_packet(uint8_t *buf, uint32_t buf_len,
-                              lx_message_t *message_out) {
+static void decode_packet(uint8_t *buf, uint32_t buf_len,
+                          lx_message_t *message_out) {
     if (buf_len < sizeof(lx_protocol_header_t)) {
         ESP_LOGW(TAG,
                  "Received message smaller than lx_protocol_header, %d bytes. "
                  "ignoring",
                  sizeof(lx_protocol_header_t));
-        return LX_OK;
+        return;
     }
 
     lx_protocol_header_t header;
@@ -102,16 +102,19 @@ static lx_err_t decode_packet(uint8_t *buf, uint32_t buf_len,
     // with strict memory alignment.
     // const lx_protocol_header_t *header2 = (lx_protocol_header_t *)buf;
 
-    const uint32_t payload_len = header.size - sizeof(lx_protocol_header_t);
+    // Validate protocol. Closest thing we have to magic bytes
+    if (header.protocol != 1024) {
+        return;
+    }
 
     // Check payload size
-    if (validate_payload_size(header.type, payload_len) != LX_OK) {
-        return LX_ERR;
+    const uint32_t payload_size = header.size - sizeof(lx_protocol_header_t);
+    if (validate_payload_size(header.type, payload_size) != LX_OK) {
+        return;
     }
 
     message_out->type = header.type;
     message_out->payload = buf + sizeof(lx_protocol_header_t);
-    return LX_OK;
 }
 
 void lx_client_poll(lx_client_t *client) {
@@ -131,12 +134,9 @@ void lx_client_poll(lx_client_t *client) {
     } else {
         // We've got a udp packet
         lx_message_t message = {.type = LX_PACKET_NONE, .payload = NULL};
+        decode_packet(client->rx_buf, len, &message);
 
-        if (decode_packet(client->rx_buf, len, &message) != LX_OK) {
-            event = (lx_event_t){.type = LX_EVENT_ERR, .data = (void *)err};
-        } else if (message.type == LX_PACKET_NONE) {
-            // This must have been a non-lifx packet, ignore
-        } else {
+        if (message.type != LX_PACKET_NONE) {
             event =
                 (lx_event_t){.type = LX_EVENT_MSG_RX, .data = (void *)&message};
         }
